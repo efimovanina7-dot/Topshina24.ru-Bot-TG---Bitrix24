@@ -1,0 +1,55 @@
+# /-----------------------------------------------------------------------------/
+# /-----------------------------------------------------------------------------/
+
+# Прод среда
+production:
+
+  # Настройки телеграмм
+  bot_token: "8526154463:AAHLkLNs5zbUY0-YsNopQoabK0T2mwXnFg0"
+
+  # Настройки почтового ящика
+  mail:
+    address: "pro-okami@yandex.ru"
+    password: "fzrqblyvajpjvpxu"
+    smtp_server: "smtp.yandex.ru"
+    smtp_port: 587
+
+  # Настройки Битрикс24
+  bitrix24:
+    webhook: "https://topshina24.bitrix24.ru/rest/167/t2y3onhpfjl5u2tk/"
+    guarantee_mp_category_id: 3
+
+  # Настройки БД
+  postgres:
+    host: localhost
+    port: 5433
+    user: topshin24
+    password: topshin24_password_2024
+    database: topshin24_db
+
+
+# Среда разработки
+development:
+
+  # Настройки телеграмм
+  bot_token: "8526154463:AAHLkLNs5zbUY0-YsNopQoabK0T2mwXnFg0"
+
+  # Настройки почтового ящика
+  mail:
+    address: "pro-okami@yandex.ru"
+    password: "fzrqblyvajpjvpxu"
+    smtp_server: "smtp.yandex.ru"
+    smtp_port: 587
+
+  # Настройки Битрикс24
+  bitrix24:
+    webhook: "https://topshina24.bitrix24.ru/rest/167/t2y3onhpfjl5u2tk/"
+    guarantee_mp_category_id: 3
+
+  # Настройки БД
+  postgres:
+    host: localhost
+    port: 5433
+    user: topshin24
+    password: topshin24_password_2024
+    database: topshin24_db
