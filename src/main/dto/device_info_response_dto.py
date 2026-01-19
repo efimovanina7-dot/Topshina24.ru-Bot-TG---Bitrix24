@@ -35,8 +35,7 @@ class DeviceInfoResponseRTO():
         text = ("*Устройство*\n\n"
                 f"🔸 Тип: _{self.type.value}_\n"
                 f"🔸 Модель: _{self.model}_\n"
-                f"🔸 Серийный номер: _{self.serial_number}_\n"
-                f"🔸 Дата покупки: _{(self.purchase_date).strftime('%d.%m.%Y')}_"
+                # Серийный номер и дата покупки больше не отображаются
                 "\n\n*Последний гарантийный план*\n\n"
                 f"🔸 Тип: _{self.latest_guarantee.guarantee_type.value}_\n"
                 f"🔸 Гарантия действует с _{self.latest_guarantee.start_date.strftime('%d.%m.%Y')}_ по _{self.latest_guarantee.end_date.strftime('%d.%m.%Y')}_\n"

@@ -1,6 +1,6 @@
 from aiogram import *
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram import Router
 
@@ -37,16 +37,20 @@ async def start(message: Message):
                                    username=message.from_user.username,
                                    full_name=message.from_user.full_name)
 
+    # Создаем inline-клавиатуру с двумя кнопками
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Активировать гарантию 📑", callback_data="activate_guarantee")],
+        [InlineKeyboardButton(text="Обратиться в техническую поддержку 🔧", url="https://t.me/topshina24")]
+    ])
+
     await send_message_from_msg(message=message,
-                                text="Это Бот-помощник компании ТОП ШИН 24! Используя данного бота вы соглашаетесь на обработку персональных данных "
+                                text="Это Бот-помощник компании ТОП ШИНА 24! Используя данного бота вы соглашаетесь на обработку персональных данных "
                                      "и на получение Email писем с выгодными предложениями.\n\n"
                                      "Для работы выберите команды из списка по кнопке 'Меню'\n\n"
                                      "Мои возможности:\n"
                                      "  🔹 Активировать гарантию 📑\n"
-                                     "  🔹 Посмотреть информацию о своих устройствах 💻\n"
-                                     "  🔹 Получить информацию о сервисном центре 🔧\n"
-                                     "  🔹 Посмотреть актуальные акции и предложения 📉",
-                                keyboard=ReplyKeyboardRemove())
+                                     "  🔹 Обратиться в рамках гарантийной поддержки 🔧",
+                                keyboard=keyboard)
 
 
 @router.message(Command('guarantee'))
@@ -103,6 +107,19 @@ async def support_command(message: Message):
         message=message,
         text="Техподдержка - @RackotXO "
     )
+
+
+@router.callback_query(F.data == "activate_guarantee")
+async def activate_guarantee_from_button(call: CallbackQuery, state: FSMContext):
+    """
+    Обработчик кнопки активации гарантии из главного меню
+
+    :param call: CallbackQuery
+    :param state: Состояние
+    """
+    from main.handler.guarantee_handler import guarantee
+    await guarantee(call.message, state)
+    await call.answer()
 
 
 @router.callback_query(F.data.startswith('main_action_'))

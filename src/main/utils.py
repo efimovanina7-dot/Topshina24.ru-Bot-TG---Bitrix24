@@ -409,8 +409,16 @@ async def is_correct_checking_email_code(code_from_user, checking_code):
     if not re.fullmatch(r'^\d+$', str(code_from_user)):
         raise IncorrectCheckingEmailCodeException
 
+    # Нормализуем коды для сравнения (убираем ведущие нули)
+    user_code_int = int(code_from_user)
+    checking_code_int = int(checking_code)
+    
     # Проверяем корректность введенного кода
-    if int(code_from_user) != int(checking_code):
+    # Также принимаем "0000" или "0" если checking_code равен 0 (заглушка)
+    if user_code_int != checking_code_int:
+        # Если это заглушка (код = 0), принимаем "0000" или "0"
+        if checking_code_int == 0 and user_code_int == 0:
+            return  # Код верный
         raise WrongCheckingEmailCodeException
 
 

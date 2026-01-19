@@ -9,7 +9,7 @@ import os
 from main.dto.guarantee_request_dto import GuaranteeCreateBitrix24RequestDTO
 from main.dto.guarantee_response_dto import GuaranteeResponseDTO
 from main.keyboard.guarantee_keyboard import *
-from main.enum.guarantee_enum import GuaranteeInformationEnum
+from main.enum.guarantee_enum import GuaranteeInformationEnum, GuaranteeTypeEnum
 from main.keyboard.main_menu_keyboard import CheckingEmailCall, get_checking_email_keyboard
 from main.middleware.middleware import ChatActionMiddleware
 from main.model.guarantee_base import GuaranteeBase
@@ -77,9 +77,7 @@ async def guarantee(message: Message, state: FSMContext):
                                          "  🔻 _Номер телефона_\n"
                                          "  🔻 _Email_\n"
                                          "  🔻 _Город/регион_\n"
-                                         "  🔻 _Источник заказа_\n"
-                                         "  🔻 _Серийный номер устройства_\n"
-                                         "  🔻 _Дата покупки устройства_"
+                                         "  🔻 _Источник заказа_"
                                     )
 
         await start_registration_guarantee(message, state)
@@ -88,93 +86,85 @@ async def guarantee(message: Message, state: FSMContext):
 @router.callback_query(F.data.startswith('user_data_approve'))
 async def prepare_to_serial_number(call: CallbackQuery, state: FSMContext):
     """
-    Метод запрашивает серийный номер устройства
+    Метод создает устройство и автоматически создает стандартную гарантию
 
     :param state: Состояние
-    :param message: Сообщение от пользователя
-    """
-
-    await send_message_from_call(call=call,
-                                text="Введите _серийный номер_ вашего устройства.\n"
-                                     "(Серийный номер должен содержать набор цифр без пробелов)",
-                                keyboard=cancel_action_keyboard)
-    await state.set_state(ActivateGuaranteeState.set_serial_number)
-
-
-@router.message(ActivateGuaranteeState.set_serial_number)
-async def set_serial_number_and_prepare_to_purchase_date(message: Message, state: FSMContext):
-    """
-    Метод принимает серийный номер от пользователя и запрашивает дату покупки устройства.
-
-    :param message: Сообщение от пользователя
-    :param state: Состояние
+    :param call: CallbackQuery от пользователя
     """
 
     try:
-        serial_number = str(message.text)
-        await is_correct_format_serial_number(serial_number)
-
-        # Поиск устройства и сохранение его в системе
-        device = await device_service.get_device_or_identify_and_create(serial_number=serial_number,
-                                                                        user_id=message.from_user.id)
-
-        await state.update_data(set_serial_number=serial_number)
-        await send_message_from_msg(message=message,
-                                    text="Введите _дату покупки_ вашего устройства, указанную в чеке.\n"
-                                         "(Дата должна быть в формате: ДД.ММ.ГГГГ)\n\n"
-                                         "*Начало гарантийного периода типа 'Стандарт' начинается с даты покупки из чека!* "
-                                         "*Сохраните чек, он понадобиться в случае обращения в Сервисный центр.*",
-                                    keyboard=cancel_action_keyboard)
-        await state.set_state(ActivateGuaranteeState.set_purchase_date)
-
-    except (IncorrectSerialNumberException, NotFoundDeviceBySerialNumberException, DeviceIsRegisteredException) as e:
-        await send_exception_and_request_data_again_from_msg(message=message,
-                                                             exception_text=e)
-        await state.set_state(ActivateGuaranteeState.set_serial_number)
-    except Exception as e:
-        logger.error(f"Произошла ошибка: {e}", extra={"service": "guarantee_handler"})
-        await send_message_from_msg(message=message,
-                                    text=f"Произошла непредвиденная ошибка, пожалуйста обратитесь к администратору!")
-
-
-@router.message(ActivateGuaranteeState.set_purchase_date)
-async def set_serial_number_and_update_data(message: Message, state: FSMContext):
-    """
-    Метод принимает дату покупки устройства от пользователя и сохраняет данные.
-
-    :param message: Сообщение пользователя
-    :param state: Состояние
-    """
-
-    try:
-        purchase_date = str(message.text)
-        await is_correct_format_date(purchase_date)
-        await is_correct_period_date(purchase_date)
-
-        purchase_date = datetime.strptime(purchase_date, "%d.%m.%Y").date()
-
-        state_dict = await state.get_data()
-
-        # Обновляем информацию по устройству
-        device = await device_service.get_device_by_serial_number_and_user_id(serial_number= state_dict["set_serial_number"],
-                                                                              user_id=message.from_user.id)
-        device.purchase_date = purchase_date
-
-        device = await device_service.update_device(device)
-        user = await user_service.get_user(chat_id=message.chat.id)
-
+        user = await user_service.get_user(chat_id=call.message.chat.id)
+        
+        # Создаем устройство без серийного номера и даты покупки
+        device = await device_service.create_device_simple(serial_number=None, user_id=user.chat_id)
+        
         await state.clear()
-
-        await send_check_user_and_device_data_message(message, user, device)
-
-    except (IncorrectDateOfPurchaseException, IncorrectPeriodDateException) as e:
-        await send_exception_and_request_data_again_from_msg(message=message,
-                                                             exception_text=e)
-        await state.set_state(ActivateGuaranteeState.set_purchase_date)
+        
+        # Автоматически создаем стандартную гарантию без выбора типа
+        guarantee_base = GuaranteeBase()
+        await guarantee_base.enrich_from_inline_keyboard(
+            device_id=device.id,
+            guarantee_type="standard",  # Автоматически стандартная гарантия
+            guarantee_standard_price=0  # Цена по умолчанию
+        )
+        
+        # Проверяем, что устройства еще не было ни одного гарантийного плана "Стандарт"
+        device_with_guarantees = await device_service.get_device_with_guarantee(device.id)
+        if not all(g.guarantee_type != GuaranteeTypeEnum.STANDARD for g in device_with_guarantees.guarantees):
+            await send_message_from_call(call=call,
+                                        text="У вас уже есть стандартная гарантия на это устройство.")
+            return
+        
+        # Сохраняем гарантийный план в БД
+        guarantee = await guarantee_service.create_guarantee_with_period(guarantee_base, device_with_guarantees)
+        
+        guarantee_create_bitrix24_dto = GuaranteeCreateBitrix24RequestDTO(guarantee, device_with_guarantees, user)
+        guarantee_dto = GuaranteeResponseDTO(guarantee, device_with_guarantees)
+        
+        # Создаем Сделку в Битрикс24
+        await guarantee_service.create_guarantee_deal_in_bitrix24(guarantee_create_bitrix24_dto)
+        
+        # Генерируем и отправляем PDF сертификат и памятку
+        pdf_path = None
+        memo_path = None
+        try:
+            pdf_path = generate_certificate_pdf(user=user, device=device_with_guarantees, guarantee=guarantee)
+            await bot.send_document(
+                call.message.chat.id,
+                FSInputFile(pdf_path),
+                caption="Цифровой гарантийный сертификат"
+            )
+            
+            # Отправляем памятку
+            from pathlib import Path
+            memo_path = Path(__file__).resolve().parents[2] / "resources" / "TopShina24_Памятка_гарантия_шины (1) (3).pdf"
+            if memo_path.exists():
+                await bot.send_document(
+                    call.message.chat.id,
+                    FSInputFile(str(memo_path)),
+                    caption="Памятка по гарантии"
+                )
+            else:
+                logger.warning(f"Файл памятки не найден: {memo_path}", extra={"service": "guarantee_handler"})
+        except Exception as e:
+            logger.error(f"Ошибка при отправке PDF: {e}", extra={"service": "guarantee_handler"})
+        finally:
+            if pdf_path and os.path.exists(pdf_path):
+                os.remove(pdf_path)
+        
+        # Благодарность вместо "Вы выбрали гарантийный план"
+        await delete_previous_message_and_send_new_from_call(
+            call=call,
+            text="✅ Спасибо за активацию гарантии!\n\n" + await guarantee_dto.get_guarantee_text()
+        )
+        
     except Exception as e:
         logger.error(f"Произошла ошибка: {e}", extra={"service": "guarantee_handler"})
-        await send_message_from_msg(message=message,
+        await send_message_from_call(call=call,
                                     text=f"Произошла непредвиденная ошибка, пожалуйста обратитесь к администратору!")
+
+
+# Обработчики серийного номера и даты покупки удалены - эти поля больше не запрашиваются
 
 
 @router.callback_query(F.data.startswith('user_data_update'))
@@ -636,7 +626,7 @@ async def set_city_and_prepare_to_order_source(message: Message, state: FSMConte
 @router.callback_query(RegistrationAndActivateGuaranteeState.set_order_source, F.data.startswith("order_source_"))
 async def set_order_source_and_prepare_to_serial_number(call: CallbackQuery, state: FSMContext):
     """
-    Метод принимает источник заказа и запрашивает серийный номер
+    Метод принимает источник заказа, создает устройство, сохраняет данные пользователя и автоматически создает гарантию
 
     :param call: CallbackQuery
     :param state: Состояние
@@ -648,108 +638,109 @@ async def set_order_source_and_prepare_to_serial_number(call: CallbackQuery, sta
             "order_source_wb": "Wildberries",
             "order_source_ym": "Яндекс Маркет",
             "order_source_avito": "Avito",
-            "order_source_retail": "Розница"
+            "order_source_retail": "Topshina24.ru"
         }
 
         order_source = source_map.get(call.data, "Неизвестно")
-        await state.update_data(set_order_source=order_source)
-
-        await send_message_from_call(call=call,
-                                    text="Введите _серийный номер_ вашего устройства.\n"
-                                         "(Серийный номер должен содержать набор цифр без пробелов)",
-                                    keyboard=cancel_action_keyboard)
-        await state.set_state(RegistrationAndActivateGuaranteeState.set_serial_number)
-
-    except Exception as e:
-        logger.error(f"Произошла ошибка: {e}", extra={"service": "guarantee_handler"})
-        await send_message_from_call(call=call,
-                                    text=f"Произошла непредвиденная ошибка, пожалуйста обратитесь к администратору!")
-
-
-@router.message(RegistrationAndActivateGuaranteeState.set_serial_number)
-async def set_serial_number_and_prepare_to_purchase_date_in_registration(message: Message, state: FSMContext):
-    """
-    Метод принимает серийный номер от пользователя и запрашивает дату покупки устройства.
-
-    :param message: Сообщение от пользователя
-    :param state: Состояние
-    """
-
-    try:
-        serial_number = str(message.text)
-        await is_correct_format_serial_number(serial_number)
-
-        # Поиск устройства и сохранение его в системе
-        device = await device_service.get_device_or_identify_and_create(serial_number=serial_number,
-                                                                        user_id=message.from_user.id)
-
-        await state.update_data(set_serial_number=serial_number)
-        await send_message_from_msg(message=message,
-                                    text="Введите _дату покупки_ вашего устройства, указанную в чеке.\n"
-                                         "(Дата должна быть в формате: ДД.ММ.ГГГГ)\n\n"
-                                         "*Начало гарантийного периода типа 'Стандарт' начинается с даты покупки из чека!* "
-                                         "*Сохраните чек, он понадобиться в случае обращения в Сервисный центр.*",
-                                    keyboard=cancel_action_keyboard)
-        await state.set_state(RegistrationAndActivateGuaranteeState.set_purchase_date)
-
-    except (IncorrectSerialNumberException, NotFoundDeviceBySerialNumberException, DeviceIsRegisteredException) as e:
-        await send_exception_and_request_data_again_from_msg(message=message,
-                                                             exception_text=e)
-        await state.set_state(RegistrationAndActivateGuaranteeState.set_serial_number)
-    except Exception as e:
-        logger.error(f"Произошла ошибка: {e}", extra={"service": "guarantee_handler"})
-        await send_message_from_msg(message=message,
-                                    text=f"Произошла непредвиденная ошибка, пожалуйста обратитесь к администратору!")
-
-
-@router.message(RegistrationAndActivateGuaranteeState.set_purchase_date)
-async def set_serial_number_and_update_data_in_registration(message: Message, state: FSMContext):
-    """
-    Метод принимает дату покупки устройства от пользователя и сохраняет данные.
-
-    :param message: Сообщение пользователя
-    :param state: Состояние
-    """
-
-    try:
-        purchase_date = str(message.text)
-        await is_correct_format_date(purchase_date)
-        await is_correct_period_date(purchase_date)
-
-        purchase_date = datetime.strptime(purchase_date, "%d.%m.%Y").date()
-
         state_dict = await state.get_data()
+        state_dict["set_order_source"] = order_source
 
-        # Обновляем информацию по устройству
-        device = await device_service.get_device_by_serial_number_and_user_id(serial_number= state_dict["set_serial_number"],
-                                                                              user_id=message.from_user.id)
-        device.purchase_date = purchase_date
-
-        device = await device_service.update_device(device)
+        # Создаем устройство без серийного номера и даты покупки
+        device = await device_service.create_device_simple(serial_number=None, user_id=call.from_user.id)
 
         # Обновляем информацию по пользователю
-        user = await user_service.get_user(message.chat.id)
+        user = await user_service.get_user(call.message.chat.id)
         user.name = state_dict["set_name"]
         user.surname = state_dict["set_surname"]
         user.phone = state_dict["set_phone"]
         user.email = state_dict["set_email"]
         user.city = state_dict.get("set_city")
-        user.order_source = state_dict.get("set_order_source")
+        user.order_source = order_source
 
         user = await user_service.update_user(user)
 
         await state.clear()
 
-        await send_check_user_and_device_data_message(message, user, device)
+        # Отправляем сообщение с благодарностью и важной информацией
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        support_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Обратиться в техническую поддержку 🔧", url="https://t.me/topshina24")]
+        ])
+        
+        await send_message_from_call(
+            call=call,
+            text=("Благодарим Вас за покупку и регистрацию гарантии, высылаем вам памятку с основными правилами.\n\n"
+                  "⚠️ *Важно!* Если при монтаже шины на диск есть подозрение на заводской брак "
+                  "(например, шина не балансируется или имеет ярко выраженное отклонение от оси вращения), "
+                  "рекомендуем не эксплуатировать такую шину и сразу обратиться к нам в этом чате — "
+                  "это упростит и ускорит процедуру возврата денежных средств."),
+            keyboard=support_keyboard
+        )
 
-    except (IncorrectDateOfPurchaseException, IncorrectPeriodDateException) as e:
-        await send_exception_and_request_data_again_from_msg(message=message,
-                                                             exception_text=e)
-        await state.set_state(RegistrationAndActivateGuaranteeState.set_purchase_date)
+        # Автоматически создаем стандартную гарантию без выбора типа
+        guarantee_base = GuaranteeBase()
+        await guarantee_base.enrich_from_inline_keyboard(
+            device_id=device.id,
+            guarantee_type="standard",  # Автоматически стандартная гарантия
+            guarantee_standard_price=0  # Цена по умолчанию
+        )
+        
+        # Проверяем, что устройства еще не было ни одного гарантийного плана "Стандарт"
+        device_with_guarantees = await device_service.get_device_with_guarantee(device.id)
+        if not all(g.guarantee_type != GuaranteeTypeEnum.STANDARD for g in device_with_guarantees.guarantees):
+            await send_message_from_call(call=call,
+                                        text="У вас уже есть стандартная гарантия на это устройство.")
+            return
+        
+        # Сохраняем гарантийный план в БД
+        guarantee = await guarantee_service.create_guarantee_with_period(guarantee_base, device_with_guarantees)
+        
+        guarantee_create_bitrix24_dto = GuaranteeCreateBitrix24RequestDTO(guarantee, device_with_guarantees, user)
+        guarantee_dto = GuaranteeResponseDTO(guarantee, device_with_guarantees)
+        
+        # Создаем Сделку в Битрикс24
+        await guarantee_service.create_guarantee_deal_in_bitrix24(guarantee_create_bitrix24_dto)
+        
+        # Генерируем и отправляем PDF сертификат и памятку
+        pdf_path = None
+        memo_path = None
+        try:
+            pdf_path = generate_certificate_pdf(user=user, device=device_with_guarantees, guarantee=guarantee)
+            await bot.send_document(
+                call.message.chat.id,
+                FSInputFile(pdf_path),
+                caption="Цифровой гарантийный сертификат"
+            )
+            
+            # Отправляем памятку
+            from pathlib import Path
+            memo_path = Path(__file__).resolve().parents[2] / "resources" / "TopShina24_Памятка_гарантия_шины (1) (3).pdf"
+            if memo_path.exists():
+                await bot.send_document(
+                    call.message.chat.id,
+                    FSInputFile(str(memo_path)),
+                    caption="Памятка по гарантии"
+                )
+            else:
+                logger.warning(f"Файл памятки не найден: {memo_path}", extra={"service": "guarantee_handler"})
+        except Exception as e:
+            logger.error(f"Ошибка при отправке PDF: {e}", extra={"service": "guarantee_handler"})
+        finally:
+            if pdf_path and os.path.exists(pdf_path):
+                os.remove(pdf_path)
+        
+        # Благодарность с информацией о гарантии
+        await send_message_from_call(
+            call=call,
+            text="✅ Спасибо за активацию гарантии!\n\n" + await guarantee_dto.get_guarantee_text()
+        )
+
     except Exception as e:
         logger.error(f"Произошла ошибка: {e}", extra={"service": "guarantee_handler"})
-        await send_message_from_msg(message=message,
+        await send_message_from_call(call=call,
                                     text=f"Произошла непредвиденная ошибка, пожалуйста обратитесь к администратору!")
+
+# Обработчики серийного номера и даты покупки для регистрации удалены - эти поля больше не запрашиваются
 
 
 ###
@@ -842,7 +833,7 @@ async def set_guarantee_type(call: CallbackQuery, callback_data: GuaranteeTypeCa
                 os.remove(pdf_path)
 
         await delete_previous_message_and_send_new_from_call(call=call,
-                                                             text="Вы выбрали гарантийный план!\n\n" + await guarantee_dto.get_guarantee_text())
+                                                             text="✅ Спасибо за активацию гарантии!\n\n" + await guarantee_dto.get_guarantee_text())
     except DeviceHasStandardGuaranteeTypeException as e:
         await send_exception_and_request_data_again_from_call(call=call,
                                                              exception_text=e)
@@ -903,17 +894,7 @@ async def set_user_and_device_data(call: CallbackQuery, callback_data: UpdateUse
             msg = ("ваш _Email_ .\n"
                    "(Email должен быть в формате: test@test.test)")
 
-        case "serial_number":
-            new_state = UpdateUserAndDeviceDataState.serial_number
-            msg = ("_серийный номер_ вашего устройства.\n"
-                   "(Серийный номер должен содержать набор цифр без пробелов)")
-
-        case "purchase_date":
-            new_state = UpdateUserAndDeviceDataState.purchase_date
-            msg = ("_дату покупки_ вашего устройства, указанную в чеке.\n"
-                   "(Дата должна быть в формате: ДД.ММ.ГГГГ)\n\n"
-                   "*Начало гарантийного периода типа 'Стандарт' начинается с даты покупки из чека!* "
-                   "*Сохраните чек, он понадобиться в случае обращения в Сервисный центр.*")
+        # Обработка serial_number и purchase_date удалена - эти поля больше не обновляются
 
     await delete_previous_message_and_send_new_from_call(call=call,
                                                          text="Введите " + msg,
@@ -1095,78 +1076,7 @@ async def set_checking_number_and_update(message: Message, state: FSMContext):
                                     text=f"Произошла непредвиденная ошибка, пожалуйста обратитесь к администратору!")
 
 
-@router.message(UpdateUserAndDeviceDataState.serial_number)
-async def set_serial_number(message: Message, state: FSMContext):
-    """
-    Метод принимает на вход обновленный серийный номер и сохраняет в БД
-
-    :param message: Сообщение пользователя
-    :param state: Состояние
-    """
-
-    try:
-
-        serial_number = str(message.text)
-        state_dict = await state.get_data()
-        device_id =  state_dict["device_id"]
-
-        await is_correct_format_serial_number(serial_number)
-
-        device = await device_service.identify_device_and_update(device_id=device_id,
-                                                                 serial_number=str(message.text))
-
-        user = await user_service.get_user(chat_id=message.chat.id)
-
-        await send_check_user_and_device_data_message(message, user, device)
-
-        await state.clear()
-
-    except (IncorrectSerialNumberException, NotFoundDeviceBySerialNumberException, DeviceIsRegisteredException) as e:
-        await send_exception_and_request_data_again_from_msg(message=message,
-                                                             exception_text=e)
-        await state.set_state(UpdateUserAndDeviceDataState.serial_number)
-    except Exception as e:
-        logger.error(f"Произошла ошибка: {e}", extra={"service": "guarantee_handler"})
-        await send_message_from_msg(message=message,
-                                    text=f"Произошла непредвиденная ошибка, пожалуйста обратитесь к администратору!")
-
-
-@router.message(UpdateUserAndDeviceDataState.purchase_date)
-async def set_purchase_date(message: Message, state: FSMContext):
-    """
-    Метод принимает на вход дату покупки устройства и сохраняет их в БД
-
-    :param message: Сообщение пользователя
-    :param state: Состояние
-    """
-    try:
-        purchase_date = str(message.text)
-        state_dict = await state.get_data()
-        device_id = state_dict["device_id"]
-
-        await is_correct_format_date(purchase_date)
-        await is_correct_period_date(purchase_date)
-
-        purchase_date = datetime.strptime(purchase_date, "%d.%m.%Y").date()
-
-        device = await device_service.get_device(device_id=device_id)
-        device.purchase_date = purchase_date
-
-        new_device = await device_service.update_device(device)
-        user = await user_service.get_user(chat_id=message.chat.id)
-
-        await send_check_user_and_device_data_message(message, user, new_device)
-
-        await state.clear()
-
-    except (IncorrectDateOfPurchaseException, IncorrectPeriodDateException) as e:
-        await send_exception_and_request_data_again_from_msg(message=message,
-                                                             exception_text=e)
-        await state.set_state(UpdateUserAndDeviceDataState.purchase_date)
-    except Exception as e:
-        logger.error(f"Произошла ошибка: {e}", extra={"service": "guarantee_handler"})
-        await send_message_from_msg(message=message,
-                                    text=f"Произошла непредвиденная ошибка, пожалуйста обратитесь к администратору!")
+# Обработчики обновления серийного номера и даты покупки удалены - эти поля больше не обновляются
 
 
 @router.callback_query(CheckingEmailCall.filter())

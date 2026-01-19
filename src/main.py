@@ -36,7 +36,28 @@ async def run_bot():
     # Перехват возможных ошибок
     dispatcher.message.middleware(ErrorLoggingMiddleware())
     dispatcher.callback_query.middleware(ErrorLoggingMiddleware())
-    dispatcher.errors.middleware(ErrorLoggingMiddleware())
+    
+    # Глобальный обработчик ошибок
+    @dispatcher.errors()
+    async def error_handler(event, exception):
+        from main.config.log_config import logger
+        
+        logger.exception(f"Глобальная ошибка: {exception}", extra={"service": "error_handler"})
+        
+        # Пытаемся отправить сообщение пользователю
+        try:
+            # event может быть ErrorEvent, который содержит update
+            if hasattr(event, 'update') and event.update:
+                from aiogram.types import Message, CallbackQuery
+                update = event.update
+                if update.message:
+                    await update.message.answer("Произошла ошибка при обработке команды. Пожалуйста, попробуйте позже или обратитесь к администратору.")
+                elif update.callback_query:
+                    await update.callback_query.message.answer("Произошла ошибка при обработке команды. Пожалуйста, попробуйте позже или обратитесь к администратору.")
+        except Exception as e:
+            logger.error(f"Не удалось отправить сообщение об ошибке: {e}", extra={"service": "error_handler"})
+        
+        return True  # Возвращаем True, чтобы показать, что ошибка обработана
 
     # Подключение роутеров
     dispatcher.include_routers(main_router,

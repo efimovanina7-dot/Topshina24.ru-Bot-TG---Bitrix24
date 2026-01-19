@@ -35,11 +35,23 @@ class GuaranteeService:
         :return: Созданный гарантийный план
         """
 
-        # Если гарантийный план "Стандарт" - приравниваем дату покупки устройства к дате начала гарантии
+        # Если гарантийный план "Стандарт" - используем дату покупки или подставляем текущую дату
         if guarantee.guarantee_type == GuaranteeTypeEnum.STANDARD:
-
-            guarantee.start_date = device.purchase_date
+            # Проверяем, что purchase_date существует и является датой
+            if device.purchase_date is not None and isinstance(device.purchase_date, date):
+                guarantee.start_date = device.purchase_date
+            else:
+                guarantee.start_date = date.today()
+            
+            # Вычисляем дату окончания гарантии
             guarantee.end_date = guarantee.start_date + relativedelta(months=GUARANTEE_PERIOD_LENGTH_STANDARD)
+        else:
+            # Подстраховка для других типов: выставляем старт и конец, если их нет
+            if guarantee.start_date is None or not isinstance(guarantee.start_date, date):
+                guarantee.start_date = date.today()
+            
+            if guarantee.end_date is None or not isinstance(guarantee.end_date, date):
+                guarantee.end_date = guarantee.start_date
 
         return await self.create_guarantee(guarantee)
 

@@ -27,8 +27,7 @@ class DeviceResponseDTO():
         """
 
         text = (f"🔸 Тип устройства: *{self.type.value}*\n"
-                f"🔸 Модель устройства: *{self.model}*\n"
-                f"🔸 Серийный номер: *{self.serial_number}*\n"
-                f"🔸 Дата покупки: *{(self.purchase_date).strftime('%d.%m.%Y')}*")
+                f"🔸 Модель устройства: *{self.model}*\n")
+                # Серийный номер и дата покупки больше не отображаются
 
         return text

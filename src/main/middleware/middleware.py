@@ -32,4 +32,18 @@ class ErrorLoggingMiddleware(BaseMiddleware):
         try:
             return await handler(event, data)
         except Exception as e:
-            logger.exception(f"Ошибка при обработке события {type(event)}: {e}", extra={"service": "general"})
+            # Логируем полную информацию об ошибке
+            logger.exception(f"Ошибка при обработке события {type(event).__name__}: {e}", extra={"service": "general"})
+            
+            # Отправляем сообщение пользователю, если это Message или CallbackQuery
+            try:
+                from aiogram.types import Message, CallbackQuery
+                if isinstance(event, Message):
+                    await event.answer("Произошла ошибка при обработке команды. Пожалуйста, попробуйте позже или обратитесь к администратору.")
+                elif isinstance(event, CallbackQuery):
+                    await event.message.answer("Произошла ошибка при обработке команды. Пожалуйста, попробуйте позже или обратитесь к администратору.")
+            except Exception as send_error:
+                logger.error(f"Не удалось отправить сообщение об ошибке: {send_error}", extra={"service": "general"})
+            
+            # Пробрасываем исключение дальше для обработки в dispatcher.errors
+            raise

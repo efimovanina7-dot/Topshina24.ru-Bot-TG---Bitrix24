@@ -1,7 +1,7 @@
 from typing import Final
 from enum import *
 
-GUARANTEE_PERIOD_LENGTH_STANDARD: Final = 12
+GUARANTEE_PERIOD_LENGTH_STANDARD: Final = 24  # 2 года гарантии
 GUARANTEE_PERIOD_LENGTH_COMFORT: Final = 0
 GUARANTEE_PERIOD_LENGTH_PREMIUM: Final = 0
 

@@ -23,24 +23,7 @@ class GuaranteeResponseDTO:
 
         :return: текст
         """
-        type = None
-
-        match self.type:
-            case GuaranteeTypeEnum.STANDARD:
-                type = GuaranteeInformationEnum.STANDARD
-            case GuaranteeTypeEnum.COMFORT:
-                type = GuaranteeInformationEnum.COMFORT
-            case GuaranteeTypeEnum.PREMIUM:
-                type = GuaranteeInformationEnum.PREMIUM
-
-        text = (f"Информация о гарантийном плане\n"
-                f"Тип: {type.value} {self.price}\n"
-                f"Распространяется на модель *{self.device.model}* с серийным номером *{self.device.serial_number}*\n"
-                f"Гарантия действует с *{self.start_date.strftime('%d.%m.%Y')}* по *{self.end_date.strftime('%d.%m.%Y')}\n*"
-                f"Оставшийся гарантийный период: *{self.remaining_length} дней*")
-
-        if self.type == GuaranteeTypeEnum.STANDARD:
-            text = text + ("\n\n*Начало гарантийного периода типа 'Стандарт' начинается с даты покупки из чека!* "
-                           "*Сохраните чек, он понадобиться в случае обращения в Сервисный центр.*")
+        text = (f"Гарантия действует с {self.start_date.strftime('%d.%m.%Y')} по {self.end_date.strftime('%d.%m.%Y')}\n"
+                f"Оставшийся гарантийный период: {self.remaining_length} дней")
 
         return text

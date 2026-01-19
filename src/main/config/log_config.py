@@ -26,14 +26,14 @@ console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-if environment_setting.ENVIRONMENT == "development":
+if environment_setting.environment == "development":
     logger.setLevel(logging.DEBUG)
 else:
     logger.setLevel(logging.INFO)
 
 
 # TODO: Когда будет настроен Logtail/BetterStack, раскомментировать:
-# if environment_setting.ENVIRONMENT == "production":
+# if environment_setting.environment == "production":
 #     try:
 #         from logtail import LogtailHandler
 #         from main.config.dynaconf_config import config_setting

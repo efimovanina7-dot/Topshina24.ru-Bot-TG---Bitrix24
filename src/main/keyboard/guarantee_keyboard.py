@@ -184,9 +184,7 @@ async def get_update_user_keyboard(device_id: int) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=UpdateUserDataButton.NAME.value, callback_data=UpdateUserCall(device_id=device_id, param="name").pack()),
          InlineKeyboardButton(text=UpdateUserDataButton.SURNAME.value, callback_data=UpdateUserCall(device_id=device_id, param="surname").pack())],
         [InlineKeyboardButton(text=UpdateUserDataButton.PHONE.value, callback_data=UpdateUserCall(device_id=device_id, param="phone").pack()),
-         InlineKeyboardButton(text=UpdateUserDataButton.EMAIL.value, callback_data=UpdateUserCall(device_id=device_id, param="email").pack())],
-        [InlineKeyboardButton(text=UpdateUserDataButton.SERIAL_NUMBER.value, callback_data=UpdateUserCall(device_id=device_id, param="serial_number").pack())],
-        [InlineKeyboardButton(text=UpdateUserDataButton.PURCHASE_DATE.value, callback_data=UpdateUserCall(device_id=device_id, param="purchase_date").pack())]
+         InlineKeyboardButton(text=UpdateUserDataButton.EMAIL.value, callback_data=UpdateUserCall(device_id=device_id, param="email").pack())]
     ])
 
     return keyboard

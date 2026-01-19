@@ -99,11 +99,11 @@ class DeviceService():
             return await self.create_device_simple(serial_number, user_id)
 
 
-    async def create_device_simple(self, serial_number, user_id):
+    async def create_device_simple(self, serial_number=None, user_id=None):
         """
         Создание устройства без верификации (Google Sheets отключен)
 
-        :param serial_number: серийный номер устройства
+        :param serial_number: серийный номер устройства (опционально)
         :param user_id: id пользователя
         :return: созданное устройство
         """
