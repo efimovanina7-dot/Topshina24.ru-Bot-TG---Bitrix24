@@ -26,7 +26,15 @@ DEAL_CATEGORY_ID_GUARANTEE_MP: Final = config_setting.BITRIX24.GUARANTEE_MP_CATE
 
 # Пользовательские поля
 
-    # Карточка Сделки
+# Карточка Сделки
 DEAL_FIELD_DEVICE_TYPE: Final = "UF_CRM_1755529008802"             # Поле "Тип устройства (гарантия)"
 DEAL_FIELD_DEVICE_PURCHASE_DATE: Final = "UF_CRM_1755529038065"    # Поле "Дата покупки (гарантия)"
 DEAL_FIELD_DEVICE_SERIAL_NUMBER: Final = "UF_CRM_1755529067817"    # Поле "Серийный номер (гарантия)"
+
+# Поля клиента в карточке сделки
+DEAL_FIELD_SURNAME: Final = "UF_CRM_1769678126"        # Фамилия
+DEAL_FIELD_NAME: Final = "UF_CRM_1769678134"            # Имя
+DEAL_FIELD_PHONE: Final = "UF_CRM_1769678144"          # Номер телефона
+DEAL_FIELD_EMAIL: Final = "UF_CRM_1769678151"           # email
+DEAL_FIELD_CITY: Final = "UF_CRM_1769678160"            # Город
+DEAL_FIELD_ORDER_SOURCE: Final = "UF_CRM_1769678168"   # Источник заказа

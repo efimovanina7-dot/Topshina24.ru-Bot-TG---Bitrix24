@@ -189,6 +189,13 @@ async def create_guarantee_deal(guarantee_dto: GuaranteeCreateBitrix24RequestDTO
                     device.purchase_date.strftime("%d.%m.%Y") if device.purchase_date else ""
                 ),
                 DEAL_FIELD_DEVICE_SERIAL_NUMBER: device.serial_number,
+                # Поля клиента в карточке сделки
+                DEAL_FIELD_SURNAME: user.surname or "",
+                DEAL_FIELD_NAME: user.name or "",
+                DEAL_FIELD_PHONE: user.phone or "",
+                DEAL_FIELD_EMAIL: user.email or "",
+                DEAL_FIELD_CITY: user.city or "",
+                DEAL_FIELD_ORDER_SOURCE: user.order_source or "",
             },
             "params": {
                 "REGISTER_SONET_EVENT": "N",

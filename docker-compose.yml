@@ -1,0 +1,21 @@
+# PostgreSQL для бота TopShina24 (параметры из application_properties.yaml)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: topshin-postgres
+    environment:
+      POSTGRES_USER: topshin24
+      POSTGRES_PASSWORD: topshin24_password_2024
+      POSTGRES_DB: topshin24_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - topshin_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U topshin24 -d topshin24_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  topshin_pgdata:
